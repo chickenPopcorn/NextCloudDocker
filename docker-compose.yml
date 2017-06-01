@@ -21,6 +21,8 @@ nextcloud:
     - /mnt/nextcloud/config:/config
     - /mnt/nextcloud/apps:/apps2
     - /mnt/nextcloud/themes:/nextcloud/themes
+  ports:
+    - "8888:8888"
 
 # If using MySQL
 nextcloud-db:
