@@ -1,5 +1,27 @@
+## wonderfall/nextcloud
+
+
+[![](https://images.microbadger.com/badges/version/wonderfall/nextcloud.svg)](http://microbadger.com/images/wonderfall/nextcloud "Get your own version badge on microbadger.com") [![](https://images.microbadger.com/badges/image/wonderfall/nextcloud.svg)](http://microbadger.com/images/wonderfall/nextcloud "Get your own image badge on microbadger.com")
+
+[![](https://images.microbadger.com/badges/version/wonderfall/nextcloud:daily.svg)](https://microbadger.com/images/wonderfall/nextcloud:daily "Get your own version badge on microbadger.com") [![](https://images.microbadger.com/badges/image/wonderfall/nextcloud:daily.svg)](https://microbadger.com/images/wonderfall/nextcloud:daily "Get your own image badge on microbadger.com")
+
+[![](https://images.microbadger.com/badges/version/wonderfall/nextcloud:11.0.svg)](https://microbadger.com/images/wonderfall/nextcloud:11.0 "Get your own version badge on microbadger.com") [![](https://images.microbadger.com/badges/image/wonderfall/nextcloud:11.0.svg)](https://microbadger.com/images/wonderfall/nextcloud:11.0 "Get your own image badge on microbadger.com")
+
+![](https://s32.postimg.org/69nev7aol/Nextcloud_logo.png)
+
+**This dockerfile is modified from wonderfall/nextcloud. For more information click [here](  https://github.com/Wonderfall/dockerfiles/blob/master/nextcloud/README.md#wonderfallnextcloud)**
+
+
 ### Docker-compose
 I advise you to use [docker-compose](https://docs.docker.com/compose/), which is a great tool for managing containers. You can create a `docker-compose.yml` with the following content (which must be adapted to your needs) and then run `docker-compose up -d nextcloud-db`, wait some 15 seconds for the database to come up, then run everything with `docker-compose up -d`, that's it! On subsequent runs,  a single `docker-compose up -d` is sufficient!
+
+### Port
+- **8888** : HTTP Nextcloud port.
+
+
+### IP
+- **IP** : Nextcloud server ip address. to find ip address of your nextcloud server `docker inspect DOCKERIMAGE | grep IPAddress | grep -Eo '[0-9.]+' | head -n1` 
+
 
 #### Docker-compose file
 Don't copy/paste without thinking! It is a model so you can see how to do it correctly.
@@ -64,3 +86,41 @@ redis:
 ```
 
 You can update everything with `docker-compose pull` followed by `docker-compose up -d`.
+
+### Reverse proxy
+Of course you can use your own solution to do so! nginx, Haproxy, Caddy, h2o, there's plenty of choices and documentation about it on the Web.
+
+Personally I'm using nginx, so if you're using nginx, there are two possibilites :
+
+- nginx is on the host : get the Nextcloud container IP address with `docker inspect nextcloud | grep IPAddress\" | head -n1 | grep -Eo "[0-9.]+" `. But whenever the container is restarted or recreated, its IP address can change. Or you can bind Nextcloud HTTP port (8888) to the host (so the reverse proxy can access with `http://localhost:8888` or whatever port you set), but in this case you should consider using a firewall since it's also listening to `http://0.0.0.0:8888`.
+
+- nginx is in a container, things are easier : you can link nextcloud container to an nginx container so you can use `proxy_pass http://nextcloud:8888`. If you're interested, I provide a nginx image available on Docker Hub : `wonderfall/boring-nginx`, and it comes with a script called `ngxproxy`, which does all the magic after asking you a few questions. Otherwise, an example of configuration would be :
+
+```
+server {
+  listen 8000;
+  server_name example.com;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 4430 ssl http2;
+  server_name example.com;
+
+  ssl_certificate /certs/example.com.crt;
+  ssl_certificate_key /certs/example.com.key;
+
+  include /etc/nginx/conf/ssl_params.conf;
+
+  client_max_body_size 10G; # change this value it according to $UPLOAD_MAX_SIZE
+
+  location / {
+    proxy_pass http://nextcloud:8888;
+    include /etc/nginx/conf/proxy_params;
+  }
+}
+```
+
+
+Headers are already sent by the container, including HSTS, so there's no need to add them again. **It is strongly recommended to use Nextcloud through an encrypted connection (HTTPS).** [Let's Encrypt](https://letsencrypt.org/) provides free SSL/TLS certificates (trustworthy!).
+
